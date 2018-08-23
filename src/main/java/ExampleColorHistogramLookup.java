@@ -6,7 +6,6 @@ import boofcv.alg.feature.color.Histogram_F64;
 import boofcv.gui.ListDisplayPanel;
 import boofcv.gui.image.ScaleOptions;
 import boofcv.gui.image.ShowImages;
-import boofcv.io.UtilIO;
 import boofcv.io.image.ConvertBufferedImage;
 import boofcv.io.image.UtilImageIO;
 import boofcv.struct.feature.TupleDesc_F64;
@@ -44,15 +43,16 @@ public class ExampleColorHistogramLookup {
      * from hue and saturation only, which makes it lighting independent.
      */
     public static List<double[]> coupledHueSat( List<File> images  ) {
-        List<double[]> points = new ArrayList<>();
+        List<double[]> points = new ArrayList<double[]>();
 
-        Planar<GrayF32> rgb = new Planar<>(GrayF32.class,1,1,3);
-        Planar<GrayF32> hsv = new Planar<>(GrayF32.class,1,1,3);
 
-        for( File f : images ) {
-            BufferedImage buffered = UtilImageIO.loadImage(f.getPath());
+        for( File imageFile : images ) {
+            BufferedImage buffered = UtilImageIO.loadImage(imageFile.getPath());
             if( buffered == null ) throw new RuntimeException("Can't load image!");
 
+            int numberOfBands = getNumberOfBands(imageFile);
+            Planar<GrayF32> rgb = new Planar<GrayF32>(GrayF32.class,1,1,numberOfBands);
+            Planar<GrayF32> hsv = new Planar<GrayF32>(GrayF32.class,1,1,numberOfBands);
             rgb.reshape(buffered.getWidth(), buffered.getHeight());
             hsv.reshape(buffered.getWidth(), buffered.getHeight());
 
@@ -82,21 +82,22 @@ public class ExampleColorHistogramLookup {
      * worse results since the basic assumption that hue and saturation are decoupled is most of the time false.
      */
     public static List<double[]> independentHueSat( List<File> images  ) {
-        List<double[]> points = new ArrayList<>();
+        List<double[]> points = new ArrayList<double[]>();
 
         // The number of bins is an important parameter.  Try adjusting it
-        TupleDesc_F64 histogramHue = new TupleDesc_F64(30);
-        TupleDesc_F64 histogramValue = new TupleDesc_F64(30);
+        TupleDesc_F64 histogramHue = new TupleDesc_F64(10000);
+        TupleDesc_F64 histogramValue = new TupleDesc_F64(10000);
 
-        List<TupleDesc_F64> histogramList = new ArrayList<>();
+        List<TupleDesc_F64> histogramList = new ArrayList<TupleDesc_F64>();
         histogramList.add(histogramHue); histogramList.add(histogramValue);
-
-        Planar<GrayF32> rgb = new Planar<>(GrayF32.class,1,1,3);
-        Planar<GrayF32> hsv = new Planar<>(GrayF32.class,1,1,3);
 
         for( File f : images ) {
             BufferedImage buffered = UtilImageIO.loadImage(f.getPath());
             if( buffered == null ) throw new RuntimeException("Can't load image!");
+
+            int numberOfBands = getNumberOfBands(f);
+            Planar<GrayF32> rgb = new Planar<GrayF32>(GrayF32.class,1,1,numberOfBands);
+            Planar<GrayF32> hsv = new Planar<GrayF32>(GrayF32.class,1,1,numberOfBands);
 
             rgb.reshape(buffered.getWidth(), buffered.getHeight());
             hsv.reshape(buffered.getWidth(), buffered.getHeight());
@@ -117,14 +118,25 @@ public class ExampleColorHistogramLookup {
         return points;
     }
 
+    private static int getNumberOfBands(File f) {
+        String fileName = f.getName();
+
+        if (fileName.endsWith(".png")){
+            return 4;
+        }
+        else {
+            return 3;
+        }
+    }
+
     /**
      * Constructs a 3D histogram using RGB.  RGB is a popular color space, but the resulting histogram will
      * depend on lighting conditions and might not produce the accurate results.
      */
     public static List<double[]> coupledRGB( List<File> images ) {
-        List<double[]> points = new ArrayList<>();
+        List<double[]> points = new ArrayList<double[]>();
 
-        Planar<GrayF32> rgb = new Planar<>(GrayF32.class,1,1,3);
+        Planar<GrayF32> rgb = new Planar<GrayF32>(GrayF32.class,1,1,3);
 
         for( File f : images ) {
             BufferedImage buffered = UtilImageIO.loadImage(f.getPath());
@@ -154,7 +166,7 @@ public class ExampleColorHistogramLookup {
      * similar images.
      */
     public static List<double[]> histogramGray( List<File> images ) {
-        List<double[]> points = new ArrayList<>();
+        List<double[]> points = new ArrayList<double[]>();
 
         GrayU8 gray = new GrayU8(1,1);
         for( File f : images ) {
@@ -177,23 +189,23 @@ public class ExampleColorHistogramLookup {
 
     public static void main(String[] args) {
 
-        String imagePath = UtilIO.pathExample("recognition/vacation");
-        List<File> images = Arrays.asList(UtilIO.findMatches(new File(imagePath),"\\w*.jpg"));
+        //String imagePath = UtilIO.pathExample("recognition/vacation");
+        List<File> images = Arrays.asList(new File("C:\\Users\\yosi\\Desktop\\images\\").listFiles());
         Collections.sort(images);
 
         // Different color spaces you can try
         List<double[]> points = coupledHueSat(images);
-//		List<double[]> points = independentHueSat(images);
+		//List<double[]> points = independentHueSat(images);
 //		List<double[]> points = coupledRGB(images);
 //		List<double[]> points = histogramGray(images);
 
         // A few suggested image you can try searching for
-        int target = 0;
+        int target = 11;
 //		int target = 28;
 //		int target = 38;
 //		int target = 46;
 //		int target = 65;
-//		int target = 77;
+		//int target = 78;
 
         double[] targetPoint = points.get(target);
 
@@ -213,7 +225,6 @@ public class ExampleColorHistogramLookup {
         // The results will be the 10 best matches, but their order can be arbitrary.  For display purposes
         // it's better to do it from best fit to worst fit
         Collections.sort(results.toList(), new Comparator<NnData>() {
-            @Override
             public int compare(NnData o1, NnData o2) {
                 if( o1.distance < o2.distance)
                     return -1;
