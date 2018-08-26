@@ -1,4 +1,4 @@
-package imageprocessing;
+package findinimage.data;
 
 import georegression.struct.point.Point2D_I32;
 
@@ -6,19 +6,18 @@ import java.util.List;
 
 public class Square {
 
-    private int minX;
-    private int minY;
-    private int maxX;
-    private int maxY;
+    private int minX = 5000;
+    private int minY = 5000;
+    private int maxX = 0;
+    private int maxY = 0;
 
     public Square(List<Point2D_I32> points) {
 
-        minY = 5000;
-        minX = 5000;
         for (Point2D_I32 point : points) {
             int y = point.getY();
             int x = point.getX();
 
+            //maxY = y > maxY ? y : maxY;
             if (y > maxY) {
                 maxY = y;
             }

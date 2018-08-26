@@ -1,4 +1,4 @@
-package imageprocessing;
+package findinimage;
 
 import boofcv.alg.feature.detect.edge.CannyEdge;
 import boofcv.alg.feature.detect.edge.EdgeContour;
@@ -11,16 +11,18 @@ import boofcv.io.image.UtilImageIO;
 import boofcv.struct.ConnectRule;
 import boofcv.struct.image.GrayS16;
 import boofcv.struct.image.GrayU8;
+import findinimage.data.Square;
 
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
 public class EdgeDetection {
 
-    public static List<Contour> getEdges(String imagePath){
-        BufferedImage image = UtilImageIO.loadImage(UtilIO.pathExample("C:\\Users\\yosi\\Downloads\\Clash_Royale.jpg"));
+    public static List<Square> getEdges(String imagePath){
+        BufferedImage image = UtilImageIO.loadImage(UtilIO.pathExample(imagePath));
 
         GrayU8 gray = ConvertBufferedImage.convertFrom(image, (GrayU8) null);
         GrayU8 edgeImage = gray.createSameShape();
@@ -42,14 +44,22 @@ public class EdgeDetection {
 
         Collections.sort(contours, new Comparator<Contour>() {
             public int compare(Contour o1, Contour o2) {
-
                 Integer first = o1.external.size();
                 Integer second = o2.external.size();
 
                 return second.compareTo(first);
             }
         });
-        return contours;
+        return convertContoursToSquares(contours);
+    }
+
+    private static List<Square> convertContoursToSquares(List<Contour> contours) {
+        List<Square> squares = new ArrayList<Square>();
+        for (Contour contour : contours) {
+            Square square = new Square(contour.external);
+            squares.add(square);
+        }
+        return squares;
     }
 
 
