@@ -11,6 +11,11 @@ public class Square {
     private int maxX = 0;
     private int maxY = 0;
 
+    public Square(int minX, int minY) {
+        this.minX = minX;
+        this.minY = minY;
+    }
+
     public Square(List<Point2D_I32> points) {
 
         for (Point2D_I32 point : points) {

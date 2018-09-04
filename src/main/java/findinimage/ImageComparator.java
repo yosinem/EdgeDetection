@@ -28,12 +28,12 @@ import java.util.*;
  * Demonstration of how to find similar images using color histograms.  findinimage.data.Constants color histograms here are treated as
  * features and extracted using a more flexible algorithm than when they are used for image processing.  It's
  * more flexible in that the bin size can be varied and n-dimensions are supported.
- *
+ * <p>
  * In this example, histograms for about 150 images are generated.  A target image is selected and the 10 most
  * similar images, according to Euclidean distance of the histograms, are found. This illustrates several concepts;
  * 1) How to construct a histogram in 1D, 2D, 3D, ..etc,  2) Histograms are just feature descriptors.
  * 3) Advantages of different color spaces.
- *
+ * <p>
  * Euclidean distance is used here since that's what the nearest-neighbor search uses.  It's possible to compare
  * two histograms using any of the distance metrics in DescriptorDistance too.
  *
@@ -46,20 +46,22 @@ public class ImageComparator {
      * from hue and saturation only, which makes it lighting independent.
      */
 
-    public void compareImages(File imageToFind, File directoryContainsImages, CompareType compareType){
+    public void compareImages(File imageToFind, File directoryContainsImages, CompareType compareType) {
         //String imagePath = UtilIO.pathExample("recognition/vacation");
         List<File> images = Arrays.asList(directoryContainsImages.listFiles());
         Collections.sort(images);
         ArrayList<File> targetImage = new ArrayList<File>();
+        targetImage.add(imageToFind);
         // Different color spaces you can try
-        List<double[]> originalImagesPoints = getPoints(images, compareType);
+        int numberOfBands = getNumberOfBands(images.get(0));
+        List<double[]> originalImagesPoints = getPoints(images, numberOfBands, compareType);
 
-        double[] targetPoint = coupledHueSat(targetImage).get(0);
+        double[] targetPoint = getPoints(targetImage, 3, compareType).get(0);
         // A few suggested image you can try searching for
 
         // Use a generic NN search algorithm.  This uses Euclidean distance as a distance metric.
         NearestNeighbor<File> nearestNeighbor = FactoryNearestNeighbor.exhaustive();
-        FastQueue<NnData<File>> results = new FastQueue(NnData.class,true);
+        FastQueue<NnData<File>> results = new FastQueue(NnData.class, true);
 
         nearestNeighbor.init(targetPoint.length);
         nearestNeighbor.setPoints(originalImagesPoints, images);
@@ -68,11 +70,11 @@ public class ImageComparator {
         showResults(imageToFind, results);
     }
 
-    private List<double[]> getPoints(List<File> images, CompareType compareType) {
+    private List<double[]> getPoints(List<File> images, int numberOfBands, CompareType compareType) {
         List<double[]> points = new ArrayList<double[]>();
-        switch (compareType){
+        switch (compareType) {
             case COUPLED_HUE_SAT:
-                points = coupledHueSat(images);
+                points = coupledHueSat(images, numberOfBands);
                 break;
             case INDEPENDENT_HUE_SAT:
                 points = independentHueSat(images);
@@ -109,36 +111,35 @@ public class ImageComparator {
             gui.addImage(image, String.format("Error %6.3f", error), ScaleOptions.ALL);
         }
 
-        ShowImages.showWindow(gui,"Similar Images",true);
+        ShowImages.showWindow(gui, "Similar Images", true);
     }
 
 
-    private static List<double[]> coupledHueSat( List<File> images  ) {
+    private static List<double[]> coupledHueSat(List<File> images, int numberOfBands) {
+
         List<double[]> points = new ArrayList<double[]>();
 
-
-        for( File imageFile : images ) {
+        for (File imageFile : images) {
             BufferedImage buffered = UtilImageIO.loadImage(imageFile.getPath());
-            if( buffered == null ) throw new RuntimeException("Can't load image!");
+            if (buffered == null) throw new RuntimeException("Can't load image!");
 
-            int numberOfBands = getNumberOfBands(imageFile);
-            Planar<GrayF32> rgb = new Planar<GrayF32>(GrayF32.class,1,1,numberOfBands);
-            Planar<GrayF32> hsv = new Planar<GrayF32>(GrayF32.class,1,1,numberOfBands);
+            Planar<GrayF32> rgb = new Planar<GrayF32>(GrayF32.class, 1, 1, numberOfBands);
+            Planar<GrayF32> hsv = new Planar<GrayF32>(GrayF32.class, 1, 1, numberOfBands);
             rgb.reshape(buffered.getWidth(), buffered.getHeight());
             hsv.reshape(buffered.getWidth(), buffered.getHeight());
 
             ConvertBufferedImage.convertFrom(buffered, rgb, true);
             ColorHsv.rgbToHsv_F32(rgb, hsv);
 
-            Planar<GrayF32> hs = hsv.partialSpectrum(0,1);
+            Planar<GrayF32> hs = hsv.partialSpectrum(0, 1);
 
             // The number of bins is an important parameter.  Try adjusting it
-            Histogram_F64 histogram = new Histogram_F64(12,12);
-            histogram.setRange(0, 0, 2.0*Math.PI); // range of hue is from 0 to 2PI
+            Histogram_F64 histogram = new Histogram_F64(12, 12);
+            histogram.setRange(0, 0, 2.0 * Math.PI); // range of hue is from 0 to 2PI
             histogram.setRange(1, 0, 1.0);         // range of saturation is from 0 to 1
 
             // Compute the histogram
-            GHistogramFeatureOps.histogram(hs,histogram);
+            GHistogramFeatureOps.histogram(hs, histogram);
 
             UtilFeature.normalizeL2(histogram); // normalize so that image size doesn't matter
 
@@ -152,7 +153,7 @@ public class ImageComparator {
      * Computes two independent 1D histograms from hue and saturation.  Less affects by sparsity, but can produce
      * worse results since the basic assumption that hue and saturation are decoupled is most of the time false.
      */
-    private static List<double[]> independentHueSat( List<File> images  ) {
+    private static List<double[]> independentHueSat(List<File> images) {
         List<double[]> points = new ArrayList<double[]>();
 
         // The number of bins is an important parameter.  Try adjusting it
@@ -160,26 +161,27 @@ public class ImageComparator {
         TupleDesc_F64 histogramValue = new TupleDesc_F64(10000);
 
         List<TupleDesc_F64> histogramList = new ArrayList<TupleDesc_F64>();
-        histogramList.add(histogramHue); histogramList.add(histogramValue);
+        histogramList.add(histogramHue);
+        histogramList.add(histogramValue);
 
-        for( File f : images ) {
+        for (File f : images) {
             BufferedImage buffered = UtilImageIO.loadImage(f.getPath());
-            if( buffered == null ) throw new RuntimeException("Can't load image!");
+            if (buffered == null) throw new RuntimeException("Can't load image!");
 
             int numberOfBands = getNumberOfBands(f);
-            Planar<GrayF32> rgb = new Planar<GrayF32>(GrayF32.class,1,1,numberOfBands);
-            Planar<GrayF32> hsv = new Planar<GrayF32>(GrayF32.class,1,1,numberOfBands);
+            Planar<GrayF32> rgb = new Planar<GrayF32>(GrayF32.class, 1, 1, numberOfBands);
+            Planar<GrayF32> hsv = new Planar<GrayF32>(GrayF32.class, 1, 1, numberOfBands);
 
             rgb.reshape(buffered.getWidth(), buffered.getHeight());
             hsv.reshape(buffered.getWidth(), buffered.getHeight());
             ConvertBufferedImage.convertFrom(buffered, rgb, true);
             ColorHsv.rgbToHsv_F32(rgb, hsv);
 
-            GHistogramFeatureOps.histogram(hsv.getBand(0), 0, 2*Math.PI,histogramHue);
+            GHistogramFeatureOps.histogram(hsv.getBand(0), 0, 2 * Math.PI, histogramHue);
             GHistogramFeatureOps.histogram(hsv.getBand(1), 0, 1, histogramValue);
 
             // need to combine them into a single descriptor for processing later on
-            TupleDesc_F64 imageHist = UtilFeature.combine(histogramList,null);
+            TupleDesc_F64 imageHist = UtilFeature.combine(histogramList, null);
 
             UtilFeature.normalizeL2(imageHist); // normalize so that image size doesn't matter
 
@@ -189,13 +191,12 @@ public class ImageComparator {
         return points;
     }
 
-    private static int getNumberOfBands(File f) {
-        String fileName = f.getName();
+    private static int getNumberOfBands(File file) {
+        String fileName = file.getName();
 
-        if (fileName.endsWith(".png")){
+        if (fileName.endsWith(".png")) {
             return 4;
-        }
-        else {
+        } else {
             return 3;
         }
     }
@@ -204,27 +205,27 @@ public class ImageComparator {
      * Constructs a 3D histogram using RGB.  RGB is a popular color space, but the resulting histogram will
      * depend on lighting conditions and might not produce the accurate results.
      */
-    private static List<double[]> coupledRGB( List<File> images ) {
+    private static List<double[]> coupledRGB(List<File> images) {
         List<double[]> points = new ArrayList<double[]>();
 
-        for( File f : images ) {
+        for (File f : images) {
 
             int numberOfBands = getNumberOfBands(f);
-            Planar<GrayF32> rgb = new Planar<GrayF32>(GrayF32.class,1,1,numberOfBands);
+            Planar<GrayF32> rgb = new Planar<GrayF32>(GrayF32.class, 1, 1, numberOfBands);
 
             BufferedImage buffered = UtilImageIO.loadImage(f.getPath());
-            if( buffered == null ) throw new RuntimeException("Can't load image!");
+            if (buffered == null) throw new RuntimeException("Can't load image!");
 
             rgb.reshape(buffered.getWidth(), buffered.getHeight());
             ConvertBufferedImage.convertFrom(buffered, rgb, true);
 
             // The number of bins is an important parameter.  Try adjusting it
-            Histogram_F64 histogram = new Histogram_F64(10,10,10);
+            Histogram_F64 histogram = new Histogram_F64(10, 10, 10);
             histogram.setRange(0, 0, 255);
             histogram.setRange(1, 0, 255);
             histogram.setRange(2, 0, 255);
 
-            GHistogramFeatureOps.histogram(rgb,histogram);
+            GHistogramFeatureOps.histogram(rgb, histogram);
 
             UtilFeature.normalizeL2(histogram); // normalize so that image size doesn't matter
 
@@ -238,13 +239,13 @@ public class ImageComparator {
      * Computes a histogram from the gray scale intensity image alone.  Probably the least effective at looking up
      * similar images.
      */
-    private static List<double[]> histogramGray( List<File> images ) {
+    private static List<double[]> histogramGray(List<File> images) {
         List<double[]> points = new ArrayList<double[]>();
 
-        GrayU8 gray = new GrayU8(1,1);
-        for( File f : images ) {
+        GrayU8 gray = new GrayU8(1, 1);
+        for (File f : images) {
             BufferedImage buffered = UtilImageIO.loadImage(f.getPath());
-            if( buffered == null ) throw new RuntimeException("Can't load image!");
+            if (buffered == null) throw new RuntimeException("Can't load image!");
 
             gray.reshape(buffered.getWidth(), buffered.getHeight());
             ConvertBufferedImage.convertFrom(buffered, gray, true);
